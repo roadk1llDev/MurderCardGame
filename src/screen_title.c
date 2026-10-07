@@ -26,30 +26,23 @@
 #include "raylib.h"
 #include "screens.h"
 
-//----------------------------------------------------------------------------------
-// Module Variables Definition (local)
-//----------------------------------------------------------------------------------
 static int framesCounter = 0;
 static int finishScreen = 0;
+static float titleTextMultiplier = 10.0f;
+static float startTextMultiplier = 5.0f;
 
-//----------------------------------------------------------------------------------
-// Title Screen Functions Definition
-//----------------------------------------------------------------------------------
-
-// Title Screen Initialization logic
 void InitTitleScreen(void)
 {
-    // TODO: Initialize TITLE screen variables here!
     framesCounter = 0;
     finishScreen = 0;
+
+    titleTextMultiplier = 10.0f;
+    startTextMultiplier = 5.0f;
 }
 
-// Title Screen Update logic
 void UpdateTitleScreen(void)
 {
-    // TODO: Update TITLE screen variables here!
 
-    // Press enter or tap to change to GAMEPLAY screen
     if (IsKeyPressed(KEY_ENTER) || IsGestureDetected(GESTURE_TAP))
     {
         //finishScreen = 1;   // OPTIONS
@@ -58,23 +51,29 @@ void UpdateTitleScreen(void)
     }
 }
 
-// Title Screen Draw logic
 void DrawTitleScreen(void)
 {
-    // TODO: Draw TITLE screen here!
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), GREEN);
-    Vector2 pos = { 20, 10 };
-    DrawTextEx(font, "TITLE SCREEN", pos, font.baseSize*3.0f, 4, DARKGREEN);
-    DrawText("PRESS ENTER or TAP to JUMP to GAMEPLAY SCREEN", 120, 220, 20, DARKGREEN);
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), RED);
+
+    const char *title = "MURDER CARD GAME";
+    int textSize = MeasureTextEx(font, title, font.baseSize*titleTextMultiplier, 4).x;
+    Vector2 pos = {(GetScreenWidth() - textSize) / 2, 100};
+
+    DrawTextEx(font, title, pos, font.baseSize*titleTextMultiplier, 4, MAROON);
+    
+    const char *startText = "PRESS ENTER TO START";
+    textSize = MeasureTextEx(font, startText, font.baseSize*startTextMultiplier, 4).x;
+    pos.x = (GetScreenWidth() - textSize) / 2;
+    pos.y = GetScreenHeight() / 2;
+
+    DrawTextEx(font, startText, pos, font.baseSize*startTextMultiplier, 4, MAROON);
 }
 
-// Title Screen Unload logic
 void UnloadTitleScreen(void)
 {
-    // TODO: Unload TITLE screen variables here!
+
 }
 
-// Title Screen should finish?
 int FinishTitleScreen(void)
 {
     return finishScreen;

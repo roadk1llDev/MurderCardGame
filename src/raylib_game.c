@@ -37,16 +37,18 @@
 // Shared Variables Definition (global)
 // NOTE: Those variables are shared between modules through screens.h
 //----------------------------------------------------------------------------------
-GameScreen currentScreen = LOGO;
+GameScreen currentScreen = TITLE;
 Font font = { 0 };
+Texture2D deckSpriteSheet = { 0 };
+Texture2D dieSpriteSheet = { 0 };
 Music music = { 0 };
 Sound fxCoin = { 0 };
 
 //----------------------------------------------------------------------------------
 // Global Variables Definition (local to this module)
 //----------------------------------------------------------------------------------
-static const int screenWidth = 800;
-static const int screenHeight = 450;
+static const int screenWidth = 1600;
+static const int screenHeight = 900;
 
 // Required variables to manage screen transitions (fade-in, fade-out)
 static float transAlpha = 0.0f;
@@ -66,6 +68,10 @@ static void DrawTransition(void);           // Draw transition effect (full-scre
 
 static void UpdateDrawFrame(void);          // Update and draw one frame
 
+Rectangle GetSpriteInSheet(Texture2D sheet, int spriteIndex, int spriteSizeX, int spriteSizeY, int offsetX, int offsetY, int pixelScale);
+
+int FindScreenSpacing(int sideBuffers, int objectAmount, int objectWidth);
+
 //----------------------------------------------------------------------------------
 // Program main entry point
 //----------------------------------------------------------------------------------
@@ -73,12 +79,16 @@ int main(void)
 {
     // Initialization
     //---------------------------------------------------------
-    InitWindow(screenWidth, screenHeight, "raylib game template");
+    InitWindow(screenWidth, screenHeight, "Murder Card Game");
 
     InitAudioDevice();      // Initialize audio device
 
     // Load global data (assets that must be available in all screens, i.e. font)
     font = LoadFont("resources/mecha.png");
+    
+    deckSpriteSheet = LoadTexture("resources/Deck.png");
+    dieSpriteSheet = LoadTexture("resources/Die.png");
+
     //music = LoadMusicStream("resources/ambient.ogg"); // TODO: Load music
     fxCoin = LoadSound("resources/coin.wav");
 
@@ -86,8 +96,8 @@ int main(void)
     PlayMusicStream(music);
 
     // Setup and init first screen
-    currentScreen = LOGO;
-    InitLogoScreen();
+    currentScreen = TITLE;
+    InitTitleScreen();
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop(UpdateDrawFrame, 60, 1);
@@ -284,7 +294,6 @@ static void UpdateDrawFrame(void)
     }
     else UpdateTransition();    // Update transition (fade-in, fade-out)
     //----------------------------------------------------------------------------------
-
     // Draw
     //----------------------------------------------------------------------------------
     BeginDrawing();
@@ -308,4 +317,31 @@ static void UpdateDrawFrame(void)
 
     EndDrawing();
     //----------------------------------------------------------------------------------
+}
+
+
+Rectangle GetSpriteInSheet(Texture2D sheet, int spriteIndex, int spriteSizeX, int spriteSizeY, int offsetX, int offsetY, int pixelScale){
+    Rectangle zeroRect = {0,0,0,0};
+
+    if(offsetX == 0 && spriteSizeX == 0) { return zeroRect; }	
+
+    int i = (sheet.width - offsetX) / (spriteSizeX + offsetX); 
+
+    int xMult = (spriteIndex % i) + 1;
+    int yMult = (spriteIndex / i) + 1;
+
+    int xPos1 = (xMult * offsetX) + ((xMult - 1) * spriteSizeX);
+    int yPos1 = (yMult * offsetY) + ((yMult - 1) * spriteSizeY); 
+    int xPos2 = (xMult * offsetX) + (xMult * spriteSizeX); 
+    int yPos2 = (yMult * offsetY) + (yMult * spriteSizeY);
+
+    Rectangle sourceRec = {xPos1 * pixelScale,yPos1 * pixelScale,(xPos2 - xPos1) * pixelScale,(yPos2 - yPos1) * pixelScale};
+    return sourceRec; 
+}
+
+int FindScreenSpacing(int sideBuffers, int objectAmount, int objectWidth){
+    int objectSpace = GetScreenWidth() - (2 * sideBuffers);
+    int spacingSpace = objectSpace - (objectAmount * objectWidth);
+
+    return spacingSpace / (objectAmount - 1);
 }

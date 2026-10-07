@@ -25,55 +25,139 @@
 
 #include "raylib.h"
 #include "screens.h"
+#include <stdio.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <time.h>
 
-//----------------------------------------------------------------------------------
-// Module Variables Definition (local)
-//----------------------------------------------------------------------------------
 static int framesCounter = 0;
 static int finishScreen = 0;
+static float monthTextTimer = 0.0f;
+static int currentMonth = 0;
+static bool die1Rolled = false;
+static bool die2Rolled = false;
+static int numberRolled1 = 0;
 
-//----------------------------------------------------------------------------------
-// Gameplay Screen Functions Definition
-//----------------------------------------------------------------------------------
-
-// Gameplay Screen Initialization logic
 void InitGameplayScreen(void)
 {
-    // TODO: Initialize GAMEPLAY screen variables here!
     framesCounter = 0;
     finishScreen = 0;
+
+    monthTextTimer = 3.0f;
+    currentMonth = 1;
+
+    die1Rolled = false;
+    die2Rolled = false;
+
+    numberRolled1 = 0;
 }
 
-// Gameplay Screen Update logic
 void UpdateGameplayScreen(void)
 {
-    // TODO: Update GAMEPLAY screen variables here!
+    if (monthTextTimer > 0.0f){
+	    monthTextTimer -= GetFrameTime();
+    }
 
-    // Press enter or tap to change to ENDING screen
-    if (IsKeyPressed(KEY_ENTER) || IsGestureDetected(GESTURE_TAP))
+    if (IsKeyPressed(KEY_ENTER))
     {
         finishScreen = 1;
         PlaySound(fxCoin);
     }
 }
 
-// Gameplay Screen Draw logic
 void DrawGameplayScreen(void)
 {
-    // TODO: Draw GAMEPLAY screen here!
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), PURPLE);
-    Vector2 pos = { 20, 10 };
-    DrawTextEx(font, "GAMEPLAY SCREEN", pos, font.baseSize*3.0f, 4, MAROON);
-    DrawText("PRESS ENTER or TAP to JUMP to ENDING SCREEN", 130, 220, 20, MAROON);
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), BEIGE);
+
+    int spriteWidth = 62;
+    int spriteHeight = 86;
+    int xOffset = 5;
+    int yOffset = 5;
+    int cardAmount = 5;
+    int cardIndex = 0;
+   
+    int scale = 2.5f;
+    int bottomBuffer = 50;
+    int sideBuffer = 50;
+
+    Vector2 origin = {0.0f, 0.0f};
+    float rotation = 0.0f;
+    
+    int spacingSize = FindScreenSpacing(sideBuffer, cardAmount, spriteWidth * scale);
+ 
+    Vector2 pos = {sideBuffer, GetScreenHeight() - (spriteHeight * scale) - bottomBuffer}; 
+    for (int i = 0; i < cardAmount; i++){
+        if(i != (cardAmount - 1)){
+            cardIndex = 1 + (i * 14);
+        } else {
+	    cardIndex = 28;
+        } 
+           
+        Rectangle sourceRec = GetSpriteInSheet(deckSpriteSheet, cardIndex, spriteWidth, spriteHeight, xOffset, yOffset, 1);
+        
+	Rectangle scaledRec = {pos.x, pos.y, spriteWidth * scale, spriteHeight * scale};
+	DrawTexturePro(deckSpriteSheet, sourceRec, scaledRec, origin, rotation, WHITE);
+
+        pos.x += (spriteWidth * scale) + spacingSize;	 
+    }
+
+    pos.x = sideBuffer;
+    pos.y = GetScreenHeight() - (spriteHeight * scale * 2) - (bottomBuffer * 2);
+    for(int i = 0; i < cardAmount; i++){
+        if (i < cardAmount - 1){
+            cardIndex = 28;
+	} else { 
+	    cardIndex = 0;
+	}
+
+	Rectangle sourceRec = GetSpriteInSheet(deckSpriteSheet, cardIndex, spriteWidth, spriteHeight, xOffset, yOffset, 1);
+	
+	Rectangle scaledRec = {pos.x, pos.y, spriteWidth * scale, spriteHeight * scale};
+	DrawTexturePro(deckSpriteSheet, sourceRec, scaledRec, origin, rotation, WHITE);
+
+	pos.x += (spriteWidth * scale) + spacingSize;
+    } 
+	
+    spriteWidth = 32;
+    spriteHeight = 32;
+    xOffset = 0;
+    yOffset = 0;
+
+    pos.x = 0;
+    pos.y = 0;
+
+    if (monthTextTimer > 0.0f){
+        char introBuffer[32];
+	snprintf(introBuffer, sizeof(introBuffer), "MONTH %d", currentMonth);
+		
+	float fontSize = 400.0f;
+	float spacing = 2.0f;
+
+	Vector2 textSize = MeasureTextEx(font, introBuffer, fontSize, spacing);
+
+	Vector2 textPos = {((float)GetScreenWidth() / 2.0f) - (textSize.x / 2.0f),
+	((float)GetScreenHeight() / 2.0f) - (textSize.y / 2.0f)};
+	DrawTextEx(font, introBuffer, textPos, fontSize, spacing, DARKBROWN);
+    } else if (!die1Rolled) {
+	die1Rolled = true;
+	
+	srand(time(NULL));
+	numberRolled1 = rand() % 6;
+    }
+	
+    if(die1Rolled){
+	Rectangle sourceRec = GetSpriteInSheet(dieSpriteSheet, numberRolled1, spriteWidth, spriteHeight, xOffset, yOffset, 1);
+
+	Rectangle scaledRec = {pos.x, pos.y, spriteWidth * scale, spriteHeight * scale};
+	DrawTexturePro(dieSpriteSheet, sourceRec, scaledRec, origin, rotation, WHITE);
+    }
 }
 
-// Gameplay Screen Unload logic
 void UnloadGameplayScreen(void)
 {
-    // TODO: Unload GAMEPLAY screen variables here!
+
 }
 
-// Gameplay Screen should finish?
 int FinishGameplayScreen(void)
 {
     return finishScreen;

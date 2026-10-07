@@ -36,12 +36,18 @@ typedef enum GameScreen { UNKNOWN = -1, LOGO = 0, TITLE, OPTIONS, GAMEPLAY, ENDI
 //----------------------------------------------------------------------------------
 extern GameScreen currentScreen;
 extern Font font;
+extern Texture2D deckSpriteSheet;
+extern Texture2D dieSpriteSheet;
 extern Music music;
 extern Sound fxCoin;
 
 #ifdef __cplusplus
 extern "C" {            // Prevents name mangling of functions
 #endif
+
+Rectangle GetSpriteInSheet(Texture2D sheet, int spriteIndex, int spriteSizeX, int spriteSizeY, int xOffset, int yOffset, int pixelScale);
+
+int FindScreenSpacing(int sideBuffers, int objectAmount, int objectWidth);
 
 //----------------------------------------------------------------------------------
 // Logo Screen Functions Declaration
