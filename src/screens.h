@@ -84,6 +84,8 @@ void UpdateGameplayScreen(void);
 void DrawGameplayScreen(void);
 void UnloadGameplayScreen(void);
 int FinishGameplayScreen(void);
+Vector2 CalculateDiePosition(int dieIndexPos, int dieWidth, int dieHeight, int dieBuffer, int cardWidth, int cardHeight, int spacingSize, int scale, int sideBuffer, int bottomBuffer, int die);
+void CheckForMoveDie(int keycode, int indexPos);
 
 //----------------------------------------------------------------------------------
 // Ending Screen Functions Declaration
