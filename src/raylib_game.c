@@ -342,6 +342,10 @@ Rectangle GetSpriteInSheet(Texture2D sheet, int spriteIndex, int spriteSizeX, in
 int FindScreenSpacing(int sideBuffers, int objectAmount, int objectWidth){
     int objectSpace = GetScreenWidth() - (2 * sideBuffers);
     int spacingSpace = objectSpace - (objectAmount * objectWidth);
+	
+    if(objectAmount == 0 || objectAmount == 1){
+	return 0;
+    }
 
     return spacingSpace / (objectAmount - 1);
 }

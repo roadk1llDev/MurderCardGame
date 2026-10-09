@@ -86,6 +86,13 @@ void UnloadGameplayScreen(void);
 int FinishGameplayScreen(void);
 Vector2 CalculateDiePosition(int dieIndexPos, int dieWidth, int dieHeight, int dieBuffer, int cardWidth, int cardHeight, int spacingSize, int scale, int sideBuffer, int bottomBuffer, int die);
 void CheckForMoveDie(int keycode, int indexPos);
+int CheckValidAmountOfCards(void);
+void PopulateShop(void);
+void CheckForBuyCard(int keycode, int index);
+void CheckForMurderCard(int keycode, int index);
+void CheckForSacrifice(int keycode, int index);
+void BanishCards(int keycode, int index);
+void RummageAndMurderCard(int keycode, int index);
 
 //----------------------------------------------------------------------------------
 // Ending Screen Functions Declaration

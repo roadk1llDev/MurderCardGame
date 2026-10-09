@@ -59,14 +59,14 @@ void DrawTitleScreen(void)
     int textSize = MeasureTextEx(font, title, font.baseSize*titleTextMultiplier, 4).x;
     Vector2 pos = {(GetScreenWidth() - textSize) / 2, 100};
 
-    DrawTextEx(font, title, pos, font.baseSize*titleTextMultiplier, 4, MAROON);
+    DrawTextEx(font, title, pos, font.baseSize*titleTextMultiplier, 4, DARKBROWN);
     
     const char *startText = "PRESS ENTER TO START";
     textSize = MeasureTextEx(font, startText, font.baseSize*startTextMultiplier, 4).x;
     pos.x = (GetScreenWidth() - textSize) / 2;
     pos.y = GetScreenHeight() / 2;
 
-    DrawTextEx(font, startText, pos, font.baseSize*startTextMultiplier, 4, MAROON);
+    DrawTextEx(font, startText, pos, font.baseSize*startTextMultiplier, 4, DARKBROWN);
 }
 
 void UnloadTitleScreen(void)
