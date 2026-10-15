@@ -60,14 +60,13 @@ struct Die {
 struct Die die[2];
 
 enum gamePhases { Roll, Rummage, Shop, Murder, War };
-enum gameState { Wait, Choose };
+enum gameState { Wait, Choose, Return};
 enum decipleType { Banker, Pol, Knight, Doc };
 
 enum gamePhases currentPhase;
 enum gameState currentState;
 
 #define CARDS_IN_MEM 13
-
 struct Deciple {
    enum decipleType deciple;
    int level;
@@ -80,6 +79,7 @@ struct Deciple hand[CARDS_IN_HAND];
 
 bool deck[56];
 int banish[56];
+int murder[56];
 
 int shop[6];
 bool shopStocked;
@@ -122,6 +122,7 @@ void InitGameplayScreen(void)
 
     for(int i = 0; i < 56; i++){
         banish[i] = -1;
+        murder[i] = 28;
 
         if(i % 14 == 0 || i % 14 == 1){
             deck[i] = false;
@@ -166,26 +167,57 @@ void UpdateGameplayScreen(void)
     */
     
     if(currentPhase == Roll && currentState == Choose && !buttonPressedThisFrame){
-        CheckForMoveDie(KEY_ONE, 1); 
-        CheckForMoveDie(KEY_TWO, 2); 
-        CheckForMoveDie(KEY_THREE, 3); 
-        CheckForMoveDie(KEY_FOUR, 4); 
+        for(int i = 0; i < 4; i++){
+            CheckForMoveDie(KEY_ONE + i, 1 + i); 
+        }
     }
 
     if(currentPhase == Shop && currentState == Choose && !buttonPressedThisFrame){
-        CheckForPurchace(KEY_ONE, 1);
-        CheckForPurchace(KEY_TWO, 2);
-        CheckForPurchace(KEY_THREE, 3);
-        CheckForPurchace(KEY_FOUR, 4);
-        CheckForPurchace(KEY_FIVE, 5);
-        CheckForPurchace(KEY_SIX, 6);
+        for(int i = 0; i < 6; i++){
+            CheckForPurchace(KEY_ONE + i, 1 + i);
+        }
+    }
+
+    if(currentPhase == Murder && currentState == Choose && !buttonPressedThisFrame){
+        for(int i = 0; i < 6; i++){
+            CheckForMurder(KEY_ONE + i, 1 + i);
+        }
     }
 
     buttonPressedThisFrame = false;
 }
 
+void CheckForMurder(int keycode, int indexPos){
+    if(!IsKeyPressed(keycode) || shop[indexPos - 1] == 28){
+        return;
+    }
+
+    if(indexPos == 6){
+        buttonPressedThisFrame = true;
+        currentState = Return;
+        return;
+    }
+
+    int murderPower = hand[1].level + hand[1].boostedLevel;
+
+    int murderItemType = shop[indexPos - 1] / 14;
+    if(shop[indexPos - 1] % 14 > murderPower){
+        return;
+    } 
+
+    for(int i = 0; i < 56; i++){
+        if(murder[i] == 28){
+            murder[i] = shop[indexPos - 1];
+        }
+    } 
+
+    buttonPressedThisFrame = true;
+    currentState = Return;
+    shop[indexPos - 1] = 28;
+}
+
 void CheckForPurchace(int keycode, int indexPos){
-    if(!IsKeyPressed(keycode)){
+    if(!IsKeyPressed(keycode) || shop[indexPos - 1] == 28){
         return;
     }
 
@@ -197,7 +229,7 @@ void CheckForPurchace(int keycode, int indexPos){
     
     int spendingPower = hand[0].level + hand[0].boostedLevel;
 
-    int shopItemType = shop[indexPos] / 14;
+    int shopItemType = shop[indexPos - 1] / 14;
     if(shop[indexPos - 1] % 14 > spendingPower || shop[indexPos - 1] % 14 < hand[shopItemType].level){
         return;
     }   
@@ -205,6 +237,14 @@ void CheckForPurchace(int keycode, int indexPos){
     hand[shopItemType].level = shop[indexPos - 1] % 14;
     buttonPressedThisFrame = true;
     currentPhase = Murder; 
+
+    for(int i = 0; i < CARDS_IN_MEM; i++){
+        if (hand[shopItemType].mem[i] == -1){
+            hand[shopItemType].mem[i] = shop[indexPos - 1];
+        }
+    }
+
+    shop[indexPos - 1] = 28;
 }
 
 void CheckForMoveDie(int keycode, int indexPos){
@@ -370,7 +410,10 @@ void RenderAndStockShop(){
                 cardsToStock--;
             }
         }
-
+        
+        for(int i = 0; i < 5; i++){
+            deck[shop[i]] = false;
+        }
         shopStocked = true;
     }
 
@@ -399,7 +442,7 @@ void DrawGameplayScreen(void)
         } 
     }
 
-    if(currentPhase == Shop && currentState == Choose){
+    if((currentPhase == Shop || currentPhase == Murder) && currentState == Choose){
         RenderAndStockShop();                
         RenderNumberLable(shop, 6, 2);
     }

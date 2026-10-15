@@ -94,6 +94,7 @@ void RenderDie(int i);
 void RenderNumberLable(int cardRow[], int cardRowSize, int rowPos);
 void RenderAndStockShop();
 void CheckForPurchace(int keycode, int indexPos);
+void CheckForMurder(int keycode, int indexPos);
 
 //----------------------------------------------------------------------------------
 // Ending Screen Functions Declaration
