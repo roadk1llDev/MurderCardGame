@@ -59,19 +59,29 @@ struct Die {
 
 struct Die die[2];
 
-enum gamePhases { Roll, Rummage, Shop, War };
+enum gamePhases { Roll, Rummage, Shop, Murder, War };
+enum gameState { Wait, Choose };
 enum decipleType { Banker, Pol, Knight, Doc };
 
 enum gamePhases currentPhase;
+enum gameState currentState;
+
+#define CARDS_IN_MEM 13
 
 struct Deciple {
    enum decipleType deciple;
    int level;
-   int boostedLevel; 
+   int boostedLevel;
+   int mem[CARDS_IN_MEM];
 };
 
 #define CARDS_IN_HAND 4
 struct Deciple hand[CARDS_IN_HAND];
+
+bool deck[56];
+int banish[56];
+
+int shop[5];
 
 void InitGameplayScreen(void)
 {
@@ -91,16 +101,44 @@ void InitGameplayScreen(void)
     for(int i = 0; i < CARDS_IN_HAND; i++){
         hand[i].deciple = i;
         hand[i].level = 1;
-        hand[i].boostedLevel = 0;	
+        hand[i].boostedLevel = 0;
+        for (int j = 0; j < CARDS_IN_MEM; j++){
+            if(j == 0){
+                hand[i].mem[j] = 1;
+            } else {
+                hand[i].mem[j] = -1;
+            }
+        }
+    }
+
+    for(int i = 0; i < 5; i++){
+        shop[i] = -1;
+    }
+
+    for(int i = 0; i < 56; i++){
+        banish[i] = -1;
+
+        if(i % 14 == 0 || i % 14 == 1){
+            deck[i] = false;
+        } else {
+            deck[i] = true;
+        }
     }
 
     currentPhase = Roll;
+    currentState = Wait;
 }
 
 void UpdateGameplayScreen(void)
 {
     if (monthTextTimer > 0.0f){
 	    monthTextTimer -= GetFrameTime();
+    } else if (currentPhase == Roll && currentState == Wait){
+        currentState = Choose;
+    }
+
+    if(currentPhase == Rummage && banish[0] == -1){
+        currentPhase = Shop;
     }
     
     /*
@@ -111,7 +149,7 @@ void UpdateGameplayScreen(void)
     }
     */
     
-    if(currentPhase == Roll && monthTextTimer <= 0.0f){
+    if(currentPhase == Roll && currentState == Choose){
         CheckForMoveDie(KEY_ONE, 1); 
         CheckForMoveDie(KEY_TWO, 2); 
         CheckForMoveDie(KEY_THREE, 3); 
@@ -190,12 +228,7 @@ void RenderNumberLable(int cardRow[], int cardRowSize, int rowPos){
 	}
 }
 
-void DrawGameplayScreen(void)
-{
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), BEIGE);
-    Vector2 origin = { 0.0f, 0.0f };
-    float rotation = 0.0f;
-
+void RenderPlayersHand(void){
     int displayHand[CARDS_IN_HAND + 1];
     for(int i = 0; i < CARDS_IN_HAND + 1; i++){
         if(i == CARDS_IN_HAND){
@@ -205,7 +238,9 @@ void DrawGameplayScreen(void)
         }
     } 
     RenderCardRow(displayHand, CARDS_IN_HAND + 1, 0);
-    
+}
+
+void RenderDeck(void){
     int row2[CARDS_IN_HAND + 1];
     for(int i = 0; i < CARDS_IN_HAND + 1; i++){
         if(i == CARDS_IN_HAND){
@@ -215,8 +250,9 @@ void DrawGameplayScreen(void)
         }
     }
     RenderCardRow(row2, CARDS_IN_HAND + 1, 1);    
-	
-    if (monthTextTimer > 0.0f){
+}
+
+void RenderMonthText(void){
         char introBuffer[32];
 	    snprintf(introBuffer, sizeof(introBuffer), "MONTH %d", currentMonth);
 		
@@ -228,6 +264,33 @@ void DrawGameplayScreen(void)
 	    Vector2 textPos = {((float)GetScreenWidth() / 2.0f) - (textSize.x / 2.0f),
 	    ((float)GetScreenHeight() / 2.0f) - (textSize.y / 2.0f)};
 	    DrawTextEx(font, introBuffer, textPos, fontSize, spacing, DARKBROWN);
+}
+
+void RenderDie(int i){
+    Vector2 origin = { 0.0f, 0.0f };
+    float rotation = 0.0f;
+
+        Vector2 pos = CalculateDiePosition(die[i].posIndex, i + 1);
+        
+        if(die[i].hasBeenRolled){
+            Rectangle sourceRec = GetSpriteInSheet(dieSpriteSheet, die[i].numberRolled, dieWidth, dieHeight, xDieOffset, yDieOffset, 1);
+
+            Rectangle scaledRec = {pos.x, pos.y, dieWidth * scale, dieHeight * scale};
+            DrawTexturePro(dieSpriteSheet, sourceRec, scaledRec, origin, rotation, WHITE);
+        } 
+}
+
+void DrawGameplayScreen(void)
+{
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), BEIGE);
+    Vector2 origin = { 0.0f, 0.0f };
+    float rotation = 0.0f;
+    
+    RenderPlayersHand();
+    RenderDeck(); 
+	
+    if (currentPhase == Roll && currentState == Wait){
+        RenderMonthText();
     } else if (!die[0].hasBeenRolled || !die[1].hasBeenRolled) {
 	    srand(time(NULL));
 
@@ -240,14 +303,7 @@ void DrawGameplayScreen(void)
     }
 
     for(int i = 0; i < 2; i++){
-        Vector2 pos = CalculateDiePosition(die[i].posIndex, i + 1);
-        
-        if(die[i].hasBeenRolled){
-            Rectangle sourceRec = GetSpriteInSheet(dieSpriteSheet, die[i].numberRolled, dieWidth, dieHeight, xDieOffset, yDieOffset, 1);
-
-            Rectangle scaledRec = {pos.x, pos.y, dieWidth * scale, dieHeight * scale};
-            DrawTexturePro(dieSpriteSheet, sourceRec, scaledRec, origin, rotation, WHITE);
-        } 
+        RenderDie(i);
     }
 	
     if (die[0].hasBeenRolled && die[1].hasBeenRolled && (currentPhase == Roll)) {

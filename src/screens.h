@@ -87,6 +87,10 @@ int FinishGameplayScreen(void);
 Vector2 CalculateDiePosition(int dieIndexPos, int dieNumber);
 void CheckForMoveDie(int keycode, int indexPos);
 void RenderCardRow(int cardRow[], int cardRowSize, int rowPos);
+void RenderPlayersHand(void);
+void RenderDeck(void);
+void RenderMonthText(void);
+void RenderDie(int i);
 void RenderNumberLable(int cardRow[], int cardRowSize, int rowPos);
 
 //----------------------------------------------------------------------------------
