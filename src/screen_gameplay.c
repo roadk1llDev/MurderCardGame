@@ -81,7 +81,10 @@ struct Deciple hand[CARDS_IN_HAND];
 bool deck[56];
 int banish[56];
 
-int shop[5];
+int shop[6];
+bool shopStocked;
+
+bool buttonPressedThisFrame;
 
 void InitGameplayScreen(void)
 {
@@ -111,9 +114,11 @@ void InitGameplayScreen(void)
         }
     }
 
-    for(int i = 0; i < 5; i++){
-        shop[i] = -1;
+    for(int i = 0; i < 6; i++){
+        shop[i] = 28;
     }
+
+    shopStocked = false;
 
     for(int i = 0; i < 56; i++){
         banish[i] = -1;
@@ -127,6 +132,8 @@ void InitGameplayScreen(void)
 
     currentPhase = Roll;
     currentState = Wait;
+
+    buttonPressedThisFrame = false;
 }
 
 void UpdateGameplayScreen(void)
@@ -134,11 +141,20 @@ void UpdateGameplayScreen(void)
     if (monthTextTimer > 0.0f){
 	    monthTextTimer -= GetFrameTime();
     } else if (currentPhase == Roll && currentState == Wait){
+        for(int i = 0; i < CARDS_IN_HAND; i++){
+            hand[i].boostedLevel = 0;
+        }
+
         currentState = Choose;
     }
 
     if(currentPhase == Rummage && banish[0] == -1){
         currentPhase = Shop;
+        shopStocked = false;
+
+        for(int i = 0; i < 6; i++){
+            shop[i] = 28;
+        }
     }
     
     /*
@@ -149,12 +165,46 @@ void UpdateGameplayScreen(void)
     }
     */
     
-    if(currentPhase == Roll && currentState == Choose){
+    if(currentPhase == Roll && currentState == Choose && !buttonPressedThisFrame){
         CheckForMoveDie(KEY_ONE, 1); 
         CheckForMoveDie(KEY_TWO, 2); 
         CheckForMoveDie(KEY_THREE, 3); 
         CheckForMoveDie(KEY_FOUR, 4); 
     }
+
+    if(currentPhase == Shop && currentState == Choose && !buttonPressedThisFrame){
+        CheckForPurchace(KEY_ONE, 1);
+        CheckForPurchace(KEY_TWO, 2);
+        CheckForPurchace(KEY_THREE, 3);
+        CheckForPurchace(KEY_FOUR, 4);
+        CheckForPurchace(KEY_FIVE, 5);
+        CheckForPurchace(KEY_SIX, 6);
+    }
+
+    buttonPressedThisFrame = false;
+}
+
+void CheckForPurchace(int keycode, int indexPos){
+    if(!IsKeyPressed(keycode)){
+        return;
+    }
+
+    if(indexPos == 6){
+        buttonPressedThisFrame = true;
+        currentPhase = Murder;
+        return;
+    } 
+    
+    int spendingPower = hand[0].level + hand[0].boostedLevel;
+
+    int shopItemType = shop[indexPos] / 14;
+    if(shop[indexPos - 1] % 14 > spendingPower || shop[indexPos - 1] % 14 < hand[shopItemType].level){
+        return;
+    }   
+
+    hand[shopItemType].level = shop[indexPos - 1] % 14;
+    buttonPressedThisFrame = true;
+    currentPhase = Murder; 
 }
 
 void CheckForMoveDie(int keycode, int indexPos){
@@ -170,20 +220,31 @@ void CheckForMoveDie(int keycode, int indexPos){
                 die[(i + 1) % 2].posIndex = placeholderIndex;
                 die[i].hasBeenMoved = !die[i].hasBeenMoved;
                 die[(i + 1) % 2].hasBeenMoved = !die[(i + 1) % 2].hasBeenMoved;
+
+                if(die[i].hasBeenMoved){
+                    hand[indexPos - 1].boostedLevel = die[i].numberRolled + 1; 
+                } else {
+                    hand[indexPos - 1].boostedLevel = die[(i + 1) % 2].numberRolled + 1; 
+                }
+
+                buttonPressedThisFrame = true;
                 return; 
             }
 
             if(!die[i].hasBeenMoved){
                 die[i].hasBeenMoved = true;
                 die[i].posIndex = indexPos;
+                hand[indexPos - 1].boostedLevel = die[i].numberRolled + 1; 
 
                 for(int i = 0; i < 2; i++){
                     if(!die[i].hasBeenMoved){
+                        buttonPressedThisFrame = true;
                         return;
                     }
                 }
 
                 currentPhase = Rummage;
+                buttonPressedThisFrame = true;
                 return;
             }
         }
@@ -280,6 +341,42 @@ void RenderDie(int i){
         } 
 }
 
+void RenderAndStockShop(){
+    if(shopStocked == false){
+        int cardsInDeck = 0; 
+        for(int i = 0; i < 56; i++){
+            if(deck[i] == true){
+                cardsInDeck++;
+            }
+        }
+
+        if(cardsInDeck == 0){
+            currentPhase = War;
+            return;
+        }
+
+        int cardsToStock;
+        if(cardsInDeck >= 5){
+            cardsToStock = 5;
+        } else {
+            cardsToStock = cardsInDeck;
+        }
+
+        int randomIndex = 0;
+        while (cardsToStock > 0){
+            randomIndex = rand() % 56;
+            if(deck[randomIndex]){
+                shop[5 - cardsToStock] = randomIndex;
+                cardsToStock--;
+            }
+        }
+
+        shopStocked = true;
+    }
+
+    RenderCardRow(shop, 6, 2);    
+}
+
 void DrawGameplayScreen(void)
 {
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), BEIGE);
@@ -300,6 +397,11 @@ void DrawGameplayScreen(void)
                 die[i].numberRolled = rand() % 6;
             } 
         } 
+    }
+
+    if(currentPhase == Shop && currentState == Choose){
+        RenderAndStockShop();                
+        RenderNumberLable(shop, 6, 2);
     }
 
     for(int i = 0; i < 2; i++){

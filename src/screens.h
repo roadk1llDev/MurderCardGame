@@ -92,6 +92,8 @@ void RenderDeck(void);
 void RenderMonthText(void);
 void RenderDie(int i);
 void RenderNumberLable(int cardRow[], int cardRowSize, int rowPos);
+void RenderAndStockShop();
+void CheckForPurchace(int keycode, int indexPos);
 
 //----------------------------------------------------------------------------------
 // Ending Screen Functions Declaration
