@@ -97,6 +97,8 @@ void RenderAndStockShop();
 void CheckForPurchace(int keycode, int indexPos);
 void CheckForMurder(int keycode, int indexPos);
 void RenderTurnInfoText(char introBuffer[]);
+void ReturnShopCards(int keycode, int indexPos);
+void RenderRummage(void);
 
 //----------------------------------------------------------------------------------
 // Ending Screen Functions Declaration

@@ -81,6 +81,9 @@ bool deck[56];
 int banish[56];
 int murder[56];
 
+int rummage[19];
+int rummagePower;
+
 int shop[6];
 bool shopStocked;
 
@@ -121,7 +124,7 @@ void InitGameplayScreen(void)
     shopStocked = false;
 
     for(int i = 0; i < 56; i++){
-        banish[i] = -1;
+        banish[i] = 28;
         murder[i] = 28;
 
         if(i % 14 == 0 || i % 14 == 1){
@@ -130,6 +133,11 @@ void InitGameplayScreen(void)
             deck[i] = true;
         }
     }
+
+    for(int i = 0; i < 19; i++){
+        rummage[i] = 28;
+    }
+    rummagePower = 0;
 
     currentPhase = Roll;
     currentState = Wait;
@@ -149,7 +157,7 @@ void UpdateGameplayScreen(void)
         currentState = Choose;
     }
 
-    if(currentPhase == Rummage && banish[0] == -1){
+    if(currentPhase == Rummage && banish[0] == 28){
         currentPhase = Shop;
         shopStocked = false;
 
@@ -184,7 +192,45 @@ void UpdateGameplayScreen(void)
         }
     }
 
+    if(currentPhase == Murder && currentState == Return && !buttonPressedThisFrame){
+        for(int i = 0; i < 6; i++){
+            ReturnShopCards(KEY_ONE + i, 1 + i); 
+        }
+    }
+
     buttonPressedThisFrame = false;
+}
+
+void ReturnShopCards(int keycode, int indexPos){
+    if(!IsKeyPressed(keycode) || shop[indexPos - 1] == 28){
+        return;
+    }
+    
+    for(int i = 0; i < 56; i++){
+        if(banish[i] == 28){
+            banish[i] = shop[indexPos - 1];
+            break;
+        } 
+    }
+
+    shop[indexPos - 1] = 28;
+
+    for(int i = 0; i < 6; i++){
+        if(shop[i] != 28){
+            return;
+        }
+    }
+
+    currentPhase = Roll;
+    currentState = Wait;
+    monthTextTimer = 1.0f;
+    currentMonth++;
+
+    for(int i = 0; i < 2; i++){
+        die[i].posIndex = 0;
+        die[i].hasBeenRolled = false;
+        die[i].hasBeenMoved = false;
+    }
 }
 
 void CheckForMurder(int keycode, int indexPos){
@@ -285,7 +331,13 @@ void CheckForMoveDie(int keycode, int indexPos){
                 }
 
                 currentPhase = Rummage;
+                currentState = Choose;
                 buttonPressedThisFrame = true;
+
+                for(int i = 0; i < 19; i++){
+                    rummage[i] = 28;
+                }
+
                 return;
             }
         }
@@ -332,9 +384,25 @@ void RenderNumberLable(int cardRow[], int cardRowSize, int rowPos){
 
 void RenderPlayersHand(void){
     int displayHand[CARDS_IN_HAND + 1];
+    
+    int banishIndex = 0;
+    for(int i = 0; i < 56; i++){
+        if(banish[i] == 28){
+            if(i != 0){
+                banishIndex = i - 1;
+            }
+
+            break;
+        }
+    }
+
     for(int i = 0; i < CARDS_IN_HAND + 1; i++){
         if(i == CARDS_IN_HAND){
-            displayHand[i] = 28;
+            if(rummagePower > banishIndex){
+                displayHand[i] = 28;
+            } else {
+                displayHand[i] = banish[banishIndex - rummagePower];
+            }
         } else {
             displayHand[i] = hand[i].level + (14 * hand[i].deciple); 
         }
@@ -370,6 +438,34 @@ void RenderMurderPile(void){
         }
     }
     RenderCardRow(row4, CARDS_IN_HAND + 1, 3);    
+}
+
+void RenderRummage(void){
+    int banishSize = 0;
+    for(int i = 0; i < 56; i++){
+        if(banish[i] == 28){
+            break;
+        }
+
+        banishSize++;
+    }
+
+    rummagePower = hand[3].level + hand[3].boostedLevel; 
+
+    if(rummagePower > banishSize){
+        rummagePower = banishSize;
+    }
+
+    int row3[rummagePower + 1];
+    for(int i = 0; i < rummagePower + 1; i++){
+        if(i == rummagePower){
+            row3[i] = 28;
+        } else {
+            row3[i] = banish[(banishSize - 1) - i];
+            rummage[i] = row3[i];
+        }
+    }
+    RenderCardRow(row3, rummagePower + 1, 2);
 }
 
 void RenderMonthText(void){
@@ -471,8 +567,13 @@ void DrawGameplayScreen(void)
             } 
         } 
     }
+    
+    if(currentPhase == Rummage && (currentState == Choose || currentState == Return)){
+        RenderRummage();
+        RenderNumberLable(rummage, rummagePower + 1, 2);
+    }
 
-    if((currentPhase == Shop || currentPhase == Murder) && currentState == Choose){
+    if((currentPhase == Shop || currentPhase == Murder) && (currentState == Choose || currentState == Return)){
         RenderAndStockShop();                
         RenderNumberLable(shop, 6, 2);
     }
