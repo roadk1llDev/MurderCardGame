@@ -47,8 +47,8 @@ const int xDieOffset = 0;
 const int yDieOffset = 0;
 
 const int scale = 2;
-const int bottomBuffer = 50;
-const int sideBuffer = 50;
+const int bottomBuffer = 40;
+const int sideBuffer = 40;
 
 struct Die {
     bool hasBeenRolled;
@@ -188,7 +188,7 @@ void UpdateGameplayScreen(void)
 }
 
 void CheckForMurder(int keycode, int indexPos){
-    if(!IsKeyPressed(keycode) || shop[indexPos - 1] == 28){
+    if(!IsKeyPressed(keycode)){
         return;
     }
 
@@ -201,13 +201,14 @@ void CheckForMurder(int keycode, int indexPos){
     int murderPower = hand[1].level + hand[1].boostedLevel;
 
     int murderItemType = shop[indexPos - 1] / 14;
-    if(shop[indexPos - 1] % 14 > murderPower){
+    if(shop[indexPos - 1] % 14 > murderPower || shop[indexPos - 1] == 28){
         return;
     } 
 
     for(int i = 0; i < 56; i++){
         if(murder[i] == 28){
             murder[i] = shop[indexPos - 1];
+            break;
         }
     } 
 
@@ -217,7 +218,7 @@ void CheckForMurder(int keycode, int indexPos){
 }
 
 void CheckForPurchace(int keycode, int indexPos){
-    if(!IsKeyPressed(keycode) || shop[indexPos - 1] == 28){
+    if(!IsKeyPressed(keycode)){
         return;
     }
 
@@ -230,7 +231,7 @@ void CheckForPurchace(int keycode, int indexPos){
     int spendingPower = hand[0].level + hand[0].boostedLevel;
 
     int shopItemType = shop[indexPos - 1] / 14;
-    if(shop[indexPos - 1] % 14 > spendingPower || shop[indexPos - 1] % 14 < hand[shopItemType].level){
+    if(shop[indexPos - 1] % 14 > spendingPower || shop[indexPos - 1] % 14 < hand[shopItemType].level || shop[indexPos - 1] == 28){
         return;
     }   
 
@@ -326,7 +327,7 @@ void RenderNumberLable(int cardRow[], int cardRowSize, int rowPos){
 
 	    Vector2 textPos = {sideBuffer + ((cardWidth * scale) / 2) - (textSize.x / 2.0f) + (i * cardWidth * scale) + (i * spacingSize), (float)GetScreenHeight() - (textSize.y / 2.0f) - (bottomBuffer / 2) - (rowPos * cardHeight * scale) - (rowPos * bottomBuffer)};
 	    DrawTextEx(font, introBuffer, textPos, fontSize, spacing, DARKBROWN);
-	}
+    }
 }
 
 void RenderPlayersHand(void){
@@ -351,6 +352,24 @@ void RenderDeck(void){
         }
     }
     RenderCardRow(row2, CARDS_IN_HAND + 1, 1);    
+}
+
+void RenderMurderPile(void){
+    int row4[CARDS_IN_HAND + 1];
+    for(int i = 0; i < CARDS_IN_HAND + 1; i++){
+        row4[i] = 28;
+    }
+
+    for(int i = 0; i < 56; i++){
+        if(murder[i] == 28){
+            if(i != 0){
+                row4[CARDS_IN_HAND] = murder[i - 1];
+            }
+            
+            break;
+        }
+    }
+    RenderCardRow(row4, CARDS_IN_HAND + 1, 3);    
 }
 
 void RenderMonthText(void){
@@ -420,6 +439,16 @@ void RenderAndStockShop(){
     RenderCardRow(shop, 6, 2);    
 }
 
+void RenderTurnInfoText(char introBuffer[]){
+	    float fontSize = 100.0f;
+	    float spacing = 2.0f;
+
+	    Vector2 textSize = MeasureTextEx(font, introBuffer, fontSize, spacing);
+
+	    Vector2 textPos = {sideBuffer, bottomBuffer};
+	    DrawTextEx(font, introBuffer, textPos, fontSize, spacing, DARKBROWN);
+}
+
 void DrawGameplayScreen(void)
 {
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), BEIGE);
@@ -428,6 +457,7 @@ void DrawGameplayScreen(void)
     
     RenderPlayersHand();
     RenderDeck(); 
+    RenderMurderPile();
 	
     if (currentPhase == Roll && currentState == Wait){
         RenderMonthText();
@@ -454,6 +484,18 @@ void DrawGameplayScreen(void)
     if (die[0].hasBeenRolled && die[1].hasBeenRolled && (currentPhase == Roll)) {
         int currentHand[5] = {1,1,1,1,0};
         RenderNumberLable(currentHand, CARDS_IN_HAND + 1, 0);
+    }
+
+    if(currentPhase == Shop && currentState == Choose){
+        char introBuffer[64];
+	    snprintf(introBuffer, sizeof(introBuffer), "Press 1-5 to buy card and 6 to skip");
+        RenderTurnInfoText(introBuffer);
+    }
+
+    if(currentPhase == Murder && currentState == Choose){
+        char introBuffer[64];
+	    snprintf(introBuffer, sizeof(introBuffer), "Press 1-5 to murder card and 6 to skip");
+        RenderTurnInfoText(introBuffer);
     }
 }
 

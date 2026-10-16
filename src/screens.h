@@ -89,12 +89,14 @@ void CheckForMoveDie(int keycode, int indexPos);
 void RenderCardRow(int cardRow[], int cardRowSize, int rowPos);
 void RenderPlayersHand(void);
 void RenderDeck(void);
+void RenderMurderPile(void);
 void RenderMonthText(void);
 void RenderDie(int i);
 void RenderNumberLable(int cardRow[], int cardRowSize, int rowPos);
 void RenderAndStockShop();
 void CheckForPurchace(int keycode, int indexPos);
 void CheckForMurder(int keycode, int indexPos);
+void RenderTurnInfoText(char introBuffer[]);
 
 //----------------------------------------------------------------------------------
 // Ending Screen Functions Declaration
