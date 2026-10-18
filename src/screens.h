@@ -99,6 +99,8 @@ void CheckForMurder(int keycode, int indexPos);
 void RenderTurnInfoText(char introBuffer[]);
 void ReturnShopCards(int keycode, int indexPos);
 void RenderRummage(void);
+void CheckForRummageMurder(int keycode, int indexPos);
+void ReturnCards(int keycode, int indexPos, int pile[]);
 
 //----------------------------------------------------------------------------------
 // Ending Screen Functions Declaration

@@ -194,43 +194,105 @@ void UpdateGameplayScreen(void)
 
     if(currentPhase == Murder && currentState == Return && !buttonPressedThisFrame){
         for(int i = 0; i < 6; i++){
-            ReturnShopCards(KEY_ONE + i, 1 + i); 
+            ReturnCards(KEY_ONE + i, 1 + i, shop); 
+        }
+    }
+
+    if(currentPhase == Rummage && currentState == Choose && !buttonPressedThisFrame){
+        for(int i = 0; i < 10; i++){
+            CheckForRummageMurder(KEY_ZERO + i, i); 
+        }
+       
+        for(int i = 0; i < 10; i++){
+            CheckForRummageMurder(KEY_A + i, 11 + i); 
+        }
+    }
+    
+    if(currentPhase == Rummage && currentState == Return && !buttonPressedThisFrame){
+        for(int i = -1; i < 9; i++){
+            ReturnCards(KEY_ZERO + i + 1, i + 1, rummage); 
+        }
+        
+        for(int i = -1; i < 9; i++){
+            ReturnCards(KEY_A + i + 1, 12 + i, rummage); 
         }
     }
 
     buttonPressedThisFrame = false;
 }
 
-void ReturnShopCards(int keycode, int indexPos){
-    if(!IsKeyPressed(keycode) || shop[indexPos - 1] == 28){
+void CheckForRummageMurder(int keycode, int indexPos){
+    if(!IsKeyPressed(keycode)){
+        return;
+    } 
+
+    if(keycode == KEY_ZERO){
+        currentState = Return;
+        buttonPressedThisFrame = true;
         return;
     }
+
+    int murderPower = hand[2].level + hand[2].boostedLevel;
+
+    if(rummage[indexPos] % 14 > murderPower || rummage[indexPos] == 28){
+        return;
+    } 
     
-    for(int i = 0; i < 56; i++){
-        if(banish[i] == 28){
-            banish[i] = shop[indexPos - 1];
-            break;
-        } 
-    }
-
-    shop[indexPos - 1] = 28;
-
-    for(int i = 0; i < 6; i++){
-        if(shop[i] != 28){
-            return;
+    for (int i = 0; i < 56; i++){
+        if(murder[i] == 28){
+            murder[i] = rummage[indexPos];
+            rummage[indexPos] = 28;
         }
     }
 
-    currentPhase = Roll;
-    currentState = Wait;
-    monthTextTimer = 1.0f;
-    currentMonth++;
+    currentState = Return;
+}
 
-    for(int i = 0; i < 2; i++){
-        die[i].posIndex = 0;
-        die[i].hasBeenRolled = false;
-        die[i].hasBeenMoved = false;
+void ReturnCards(int keycode, int indexPos, int pile[]){
+    if(!IsKeyPressed(keycode) || pile[indexPos - 1] == 28){
+        return;
     }
+
+    for(int i = 0; i < 56; i++){
+        if(banish[i] == 28){
+            banish[i] = pile[indexPos - 1];
+            printf("you chose the element in location %i and it is being put in the banish pile at element %i\n", indexPos - 1, i);
+            break;
+        }
+    }
+
+    pile[indexPos - 1] = 28;
+
+    switch(currentPhase){
+        case Murder:
+            for(int i = 0; i < 6; i++){
+                if(shop[i] != 28){
+                    return;
+                }
+            }
+    
+            currentPhase = Roll;
+            currentState = Wait;
+            monthTextTimer = 1.0f;
+            currentMonth++;
+
+            for(int i = 0; i < 2; i++){
+                die[i].posIndex = 0;
+                die[i].hasBeenRolled = false;
+                die[i].hasBeenMoved = false;
+            }
+            break;
+        case Rummage:
+            for(int i = 0; i < 19; i++){
+                if(rummage[i] != 28){
+                    return;
+                }
+            }
+
+            currentPhase = Shop;
+            currentState = Choose;
+            break;
+    } 
 }
 
 void CheckForMurder(int keycode, int indexPos){
@@ -596,6 +658,24 @@ void DrawGameplayScreen(void)
     if(currentPhase == Murder && currentState == Choose){
         char introBuffer[64];
 	    snprintf(introBuffer, sizeof(introBuffer), "Press 1-5 to murder card and 6 to skip");
+        RenderTurnInfoText(introBuffer);
+    }
+
+    if(currentPhase == Murder && currentState == Return){
+        char introBuffer[64];
+	    snprintf(introBuffer, sizeof(introBuffer), "Press 1-5 to return cards");
+        RenderTurnInfoText(introBuffer);
+    }
+
+    if(currentPhase == Rummage && currentState == Choose){
+        char introBuffer[64];
+	    snprintf(introBuffer, sizeof(introBuffer), "Press 1-9 and a-i to murder card and 0 to skip");
+        RenderTurnInfoText(introBuffer);
+    }
+
+    if(currentPhase == Rummage && currentState == Return){
+        char introBuffer[64];
+	    snprintf(introBuffer, sizeof(introBuffer), "Press 1-9 and a-i to return cards");
         RenderTurnInfoText(introBuffer);
     }
 }
