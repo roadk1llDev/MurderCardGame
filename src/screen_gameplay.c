@@ -57,6 +57,15 @@ struct Die {
     int posIndex;
 };
 
+Music baseTrack;
+
+struct musicLayer {
+    Music track;
+    float volume;
+};
+
+struct musicLayer phaseLayer[5];
+
 struct Die die[2];
 
 enum gamePhases { Roll, Rummage, Shop, Murder, War };
@@ -143,6 +152,20 @@ void InitGameplayScreen(void)
     currentState = Wait;
 
     buttonPressedThisFrame = false;
+
+    baseTrack = LoadMusicStream("resources/TillWinterBase.wav");
+    phaseLayer[0].track = LoadMusicStream("resources/TillWinterRoll.wav");
+    phaseLayer[1].track = LoadMusicStream("resources/TillWinterRummage.wav");
+    phaseLayer[2].track = LoadMusicStream("resources/TillWinterShop.wav"); 
+    phaseLayer[3].track = LoadMusicStream("resources/TillWinterMurder.wav"); 
+    phaseLayer[4].track = LoadMusicStream("resources/TillWinterWar.wav");
+    
+    PlayMusicStream(baseTrack);
+    for(int i = 0; i < 5; i++){
+        phaseLayer[i].volume = 0;
+        PlayMusicStream(phaseLayer[i].track);
+        SetMusicVolume(phaseLayer[i].track, phaseLayer[i].volume);
+    }
 }
 
 void UpdateGameplayScreen(void)
@@ -156,8 +179,8 @@ void UpdateGameplayScreen(void)
 
         currentState = Choose;
     }
-
-    if(currentPhase == Rummage && banish[0] == 28){
+    
+    if(currentPhase == Rummage && banish[0] == 28 && rummage[0] == 28){
         currentPhase = Shop;
         shopStocked = false;
 
@@ -173,6 +196,28 @@ void UpdateGameplayScreen(void)
         PlaySound(fxCoin);
     }
     */
+
+    UpdateMusicStream(baseTrack);
+    SetMusicVolume(baseTrack, 0.5f);
+    for(int i = 0; i < 5; i++){
+        UpdateMusicStream(phaseLayer[i].track);
+
+        if(currentPhase == i){
+            if(phaseLayer[i].volume < 0.5f){
+                phaseLayer[i].volume += 0.01f; 
+            } else if (phaseLayer[i].volume > 0.5f){
+                phaseLayer[i].volume = 0.5f;
+            }
+        } else {
+            if(phaseLayer[i].volume > 0.0f){
+                phaseLayer[i].volume -= 0.01f;
+            } else if (phaseLayer[i].volume < 0.0f){
+                phaseLayer[i].volume = 0.0f;
+            }
+        }
+
+        SetMusicVolume(phaseLayer[i].track, phaseLayer[i].volume);
+    }
     
     if(currentPhase == Roll && currentState == Choose && !buttonPressedThisFrame){
         for(int i = 0; i < 4; i++){
@@ -204,17 +249,17 @@ void UpdateGameplayScreen(void)
         }
        
         for(int i = 0; i < 10; i++){
-            CheckForRummageMurder(KEY_A + i, 11 + i); 
+            CheckForRummageMurder(KEY_A + i, 10 + i); 
         }
     }
     
     if(currentPhase == Rummage && currentState == Return && !buttonPressedThisFrame){
-        for(int i = -1; i < 9; i++){
-            ReturnCards(KEY_ZERO + i + 1, i + 1, rummage); 
+        for(int i = 0; i < 9; i++){
+            ReturnCards(KEY_ONE + i, 1 + i, rummage); 
         }
         
-        for(int i = -1; i < 9; i++){
-            ReturnCards(KEY_A + i + 1, 12 + i, rummage); 
+        for(int i = 0; i < 10; i++){
+            ReturnCards(KEY_A + i, 10 + i, rummage); 
         }
     }
 
@@ -234,18 +279,20 @@ void CheckForRummageMurder(int keycode, int indexPos){
 
     int murderPower = hand[2].level + hand[2].boostedLevel;
 
-    if(rummage[indexPos] % 14 > murderPower || rummage[indexPos] == 28){
+    if(rummage[indexPos - 1] % 14 > murderPower || rummage[indexPos - 1] == 28){
         return;
     } 
     
     for (int i = 0; i < 56; i++){
         if(murder[i] == 28){
-            murder[i] = rummage[indexPos];
-            rummage[indexPos] = 28;
+            murder[i] = rummage[indexPos - 1];
+            rummage[indexPos - 1] = 28;
+            break;
         }
     }
 
     currentState = Return;
+    buttonPressedThisFrame = true;
 }
 
 void ReturnCards(int keycode, int indexPos, int pile[]){
@@ -256,7 +303,6 @@ void ReturnCards(int keycode, int indexPos, int pile[]){
     for(int i = 0; i < 56; i++){
         if(banish[i] == 28){
             banish[i] = pile[indexPos - 1];
-            printf("you chose the element in location %i and it is being put in the banish pile at element %i\n", indexPos - 1, i);
             break;
         }
     }
@@ -291,6 +337,12 @@ void ReturnCards(int keycode, int indexPos, int pile[]){
 
             currentPhase = Shop;
             currentState = Choose;
+            shopStocked = false;
+            
+            for(int i = 0; i < 6; i++){
+                shop[i] = 28;
+            }
+
             break;
     } 
 }
@@ -432,7 +484,11 @@ void RenderNumberLable(int cardRow[], int cardRowSize, int rowPos){
         }
 
         char introBuffer[32];
-	    snprintf(introBuffer, sizeof(introBuffer), "%d", i + 1);
+        if(i >= 9){
+            snprintf(introBuffer, sizeof(introBuffer), "%c", 'a' + (i - 10));
+        } else {
+	        snprintf(introBuffer, sizeof(introBuffer), "%d", i + 1);
+        }
 		
 	    float fontSize = 40.0f;
 	    float spacing = 2.0f;
@@ -460,11 +516,7 @@ void RenderPlayersHand(void){
 
     for(int i = 0; i < CARDS_IN_HAND + 1; i++){
         if(i == CARDS_IN_HAND){
-            if(rummagePower > banishIndex){
-                displayHand[i] = 28;
-            } else {
-                displayHand[i] = banish[banishIndex - rummagePower];
-            }
+            displayHand[i] = banish[banishIndex];
         } else {
             displayHand[i] = hand[i].level + (14 * hand[i].deciple); 
         }
@@ -512,10 +564,26 @@ void RenderRummage(void){
         banishSize++;
     }
 
-    rummagePower = hand[3].level + hand[3].boostedLevel; 
+    int rummageSize = 0;
+    for(int i = 0; i < 19; i++){
+        if(rummage[i] != 28){
+            rummageSize++;
+        }
+    }
 
-    if(rummagePower > banishSize){
-        rummagePower = banishSize;
+    if(rummageSize == 0 && banishSize > 0){
+        rummagePower = hand[3].level + hand[3].boostedLevel; 
+
+        if(rummagePower > banishSize){
+            rummagePower = banishSize;
+        }
+
+        int banishIndex = banishSize - 1;
+        for(int i = 0; i < rummagePower; i++){
+            rummage[i] = banish[banishIndex];
+            banish[banishIndex] = 28;
+            banishIndex--; 
+        }
     }
 
     int row3[rummagePower + 1];
@@ -523,10 +591,10 @@ void RenderRummage(void){
         if(i == rummagePower){
             row3[i] = 28;
         } else {
-            row3[i] = banish[(banishSize - 1) - i];
-            rummage[i] = row3[i];
+            row3[i] = rummage[i];
         }
     }
+
     RenderCardRow(row3, rummagePower + 1, 2);
 }
 
@@ -584,13 +652,11 @@ void RenderAndStockShop(){
             randomIndex = rand() % 56;
             if(deck[randomIndex]){
                 shop[5 - cardsToStock] = randomIndex;
+                deck[shop[5 - cardsToStock]] = false;
                 cardsToStock--;
             }
         }
-        
-        for(int i = 0; i < 5; i++){
-            deck[shop[i]] = false;
-        }
+         
         shopStocked = true;
     }
 
@@ -598,7 +664,7 @@ void RenderAndStockShop(){
 }
 
 void RenderTurnInfoText(char introBuffer[]){
-	    float fontSize = 100.0f;
+	    float fontSize = 80.0f;
 	    float spacing = 2.0f;
 
 	    Vector2 textSize = MeasureTextEx(font, introBuffer, fontSize, spacing);
@@ -713,7 +779,12 @@ Vector2 CalculateDiePosition(int dieIndexPos, int dieNumber){
 
 void UnloadGameplayScreen(void)
 {
+    UnloadMusicStream(baseTrack);
+    for(int i = 0; i < 5; i++){
+        UnloadMusicStream(phaseLayer[i].track);
+    }
 
+    CloseAudioDevice();
 }
 
 int FinishGameplayScreen(void)
