@@ -30,6 +30,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+bool debug;
+
 static int framesCounter = 0;
 static int finishScreen = 0;
 static float monthTextTimer = 0.0f;
@@ -68,7 +70,7 @@ struct musicLayer phaseLayer[5];
 
 struct Die die[2];
 
-enum gamePhases { Roll, Rummage, Shop, Murder, War };
+enum gamePhases { Roll, Rummage, Shop, Murder, War, Double};
 enum gameState { Wait, Choose, Return};
 enum decipleType { Banker, Pol, Knight, Doc };
 
@@ -83,12 +85,21 @@ struct Deciple {
    int mem[CARDS_IN_MEM];
 };
 
+struct rowPosInfo {
+    float currentPos;
+    float desiredPos;
+};
+
+struct rowPosInfo row0Pos[6];
+struct rowPosInfo row2Pos[20];
+
 #define CARDS_IN_HAND 4
 struct Deciple hand[CARDS_IN_HAND];
 
 bool deck[56];
 int banish[56];
 int murder[56];
+int warHand[4];
 
 int rummage[19];
 int rummagePower;
@@ -100,6 +111,8 @@ bool buttonPressedThisFrame;
 
 void InitGameplayScreen(void)
 {
+    debug = true;
+
     framesCounter = 0;
     finishScreen = 0;
 
@@ -141,6 +154,10 @@ void InitGameplayScreen(void)
         } else {
             deck[i] = true;
         }
+    }
+
+    for(int i = 0; i < 4; i++){
+        warHand[i] = 28;
     }
 
     for(int i = 0; i < 19; i++){
@@ -263,7 +280,78 @@ void UpdateGameplayScreen(void)
         }
     }
 
+    if(currentPhase == Double){
+        if(currentState == Return){
+            ReturnDouble(KEY_ENTER, 1); 
+        } else if (currentState == Choose){
+            for(int i = 0; i < 4; i++){
+                ReturnDouble(KEY_ONE + i, 1 + i);
+            }
+        }
+    }
+
     buttonPressedThisFrame = false;
+}
+
+void ReturnDouble(int keycode, int indexPos){
+    if(!IsKeyPressed(keycode)){
+        return;
+    }
+
+    if(currentState == Return){
+        int highestCard = 0;
+        for(int i = 0; i < 4; i++){
+            if(hand[i].level > highestCard){
+                indexPos = i + 1;
+                highestCard = hand[i].level;
+            }
+        }
+    } else {
+        int highestCard = 0;
+        bool validIndex[4];
+        for(int i = 0; i < 4; i++){
+            if(hand[i].level == highestCard){
+                validIndex[i] = true;
+            } else if (hand[i].level > highestCard){
+                for(int j = 0; j < 4; j++){
+                    validIndex[j] = false;
+                }
+
+                validIndex[i] = true;
+                highestCard = hand[i].level;
+            }
+        }
+
+        if(!validIndex[indexPos - 1]){
+            return; 
+        }
+    }
+    
+    int memIndex = -1;
+    for(int i = 0; i < 13; i++){
+        if(hand[indexPos - 1].mem[i] == - 1 && i != 0 && i != 1){
+            memIndex = i - 1;
+            break; 
+        }
+    }
+
+    if(memIndex == -1){
+        memIndex = 12;
+    }
+
+    for(int i = 0; i < 56; i++){
+        if(banish[i] == 28){
+            banish[i] = hand[indexPos - 1].mem[memIndex];
+            break;
+        }
+    }
+
+    hand[indexPos - 1].mem[memIndex] = -1;
+    hand[indexPos - 1].level = hand[indexPos - 1].mem[memIndex - 1] % 14;
+
+    currentPhase = Roll;
+    currentState = Wait;
+    buttonPressedThisFrame = true;
 }
 
 void CheckForRummageMurder(int keycode, int indexPos){
@@ -290,8 +378,23 @@ void CheckForRummageMurder(int keycode, int indexPos){
             break;
         }
     }
+    
+    for(int i = 0; i < 19; i++){
+        if(rummage[i] != 28){
+            currentState = Return;
+            buttonPressedThisFrame = true;
+            return;
+        }
+    }
 
-    currentState = Return;
+    currentPhase = Shop;
+    currentState = Choose;
+    shopStocked = false;
+            
+    for(int i = 0; i < 6; i++){
+        shop[i] = 28;
+    }
+    
     buttonPressedThisFrame = true;
 }
 
@@ -402,6 +505,7 @@ void CheckForPurchace(int keycode, int indexPos){
     for(int i = 0; i < CARDS_IN_MEM; i++){
         if (hand[shopItemType].mem[i] == -1){
             hand[shopItemType].mem[i] = shop[indexPos - 1];
+            break;
         }
     }
 
@@ -463,8 +567,9 @@ void RenderCardRow(int cardRow[], int cardRowSize, int rowPos){
     float rotation = 0.0f;
 
     int spacingSize = FindScreenSpacing(sideBuffer, cardRowSize, cardWidth * scale);
-
+    
     Vector2 pos = {sideBuffer, GetScreenHeight() - ((rowPos + 1) * cardHeight * scale) - ((rowPos + 1) * bottomBuffer)};
+
     for(int i = 0; i < cardRowSize; i++){
        Rectangle sourceRec = GetSpriteInSheet(deckSpriteSheet, cardRow[i], cardWidth, cardHeight, xOffset, yOffset, 1);
 
@@ -485,7 +590,7 @@ void RenderNumberLable(int cardRow[], int cardRowSize, int rowPos){
 
         char introBuffer[32];
         if(i >= 9){
-            snprintf(introBuffer, sizeof(introBuffer), "%c", 'a' + (i - 10));
+            snprintf(introBuffer, sizeof(introBuffer), "%c", 'a' + (i - 9));
         } else {
 	        snprintf(introBuffer, sizeof(introBuffer), "%d", i + 1);
         }
@@ -537,6 +642,42 @@ void RenderDeck(void){
 }
 
 void RenderMurderPile(void){
+    if(currentPhase == War && currentState == Wait){
+        int rolesFilled = 0;
+        int cardsRemaning = 0;
+        for(int i = 0; i < 56; i++){
+            if(banish[i] == 28){
+                break;
+            }
+
+            cardsRemaning++;
+        }
+        
+        int randomIndex;
+        while(cardsRemaning > 0 && rolesFilled < 4){
+            randomIndex = rand() % 56;
+
+            if(banish[randomIndex] == 28){
+                continue;
+            }
+          
+            int banishCardType = banish[randomIndex] / 14;
+
+            if(warHand[banishCardType] == 28){
+                rolesFilled++;
+            } else if (warHand[banishCardType] < banish[randomIndex]) {
+                warHand[banishCardType] = banish[randomIndex];
+            }
+
+            banish[randomIndex] = 28;
+            cardsRemaning--;
+        }
+
+        if(rolesFilled >= 4){
+            currentState = Choose; 
+        }
+    }
+
     int row4[CARDS_IN_HAND + 1];
     for(int i = 0; i < CARDS_IN_HAND + 1; i++){
         row4[i] = 28;
@@ -600,7 +741,14 @@ void RenderRummage(void){
 
 void RenderMonthText(void){
         char introBuffer[32];
-	    snprintf(introBuffer, sizeof(introBuffer), "MONTH %d", currentMonth);
+
+        if(currentMonth >= 11){
+	        snprintf(introBuffer, sizeof(introBuffer), "WAR!");
+            currentPhase = War;
+            currentState = Wait;
+        } else {
+	        snprintf(introBuffer, sizeof(introBuffer), "MONTH %d", currentMonth);
+        }
 		
 	    float fontSize = 400.0f;
 	    float spacing = 2.0f;
@@ -664,13 +812,27 @@ void RenderAndStockShop(){
 }
 
 void RenderTurnInfoText(char introBuffer[]){
-	    float fontSize = 80.0f;
-	    float spacing = 2.0f;
+	float fontSize = 80.0f;
+	float spacing = 2.0f;
 
-	    Vector2 textSize = MeasureTextEx(font, introBuffer, fontSize, spacing);
+	Vector2 textSize = MeasureTextEx(font, introBuffer, fontSize, spacing);
 
-	    Vector2 textPos = {sideBuffer, bottomBuffer};
-	    DrawTextEx(font, introBuffer, textPos, fontSize, spacing, DARKBROWN);
+	Vector2 textPos = {sideBuffer, bottomBuffer};
+	DrawTextEx(font, introBuffer, textPos, fontSize, spacing, DARKBROWN);
+}
+
+void RenderDebugText(char introBuffer[]){
+    if(debug == false){
+        return;
+    }
+
+	float fontSize = 40.0f;
+	float spacing = 2.0f;
+
+	Vector2 textSize = MeasureTextEx(font, introBuffer, fontSize, spacing);
+
+	Vector2 textPos = {sideBuffer, bottomBuffer + 100};
+	DrawTextEx(font, introBuffer, textPos, fontSize, spacing, DARKBROWN);
 }
 
 void DrawGameplayScreen(void)
@@ -683,7 +845,7 @@ void DrawGameplayScreen(void)
     RenderDeck(); 
     RenderMurderPile();
 	
-    if (currentPhase == Roll && currentState == Wait){
+    if ((currentPhase == Roll || currentPhase == War) && currentState == Wait){
         RenderMonthText();
     } else if (!die[0].hasBeenRolled || !die[1].hasBeenRolled) {
 	    srand(time(NULL));
@@ -694,6 +856,11 @@ void DrawGameplayScreen(void)
                 die[i].numberRolled = rand() % 6;
             } 
         } 
+
+        if(die[0].numberRolled == die[1].numberRolled){
+            currentPhase = Double;
+            currentState = Wait;
+        }
     }
     
     if(currentPhase == Rummage && (currentState == Choose || currentState == Return)){
@@ -743,6 +910,102 @@ void DrawGameplayScreen(void)
         char introBuffer[64];
 	    snprintf(introBuffer, sizeof(introBuffer), "Press 1-9 and a-i to return cards");
         RenderTurnInfoText(introBuffer);
+    }
+        
+    char introBuffer[64];
+
+    enum gamePhases { Roll, Rummage, Shop, Murder, War, Double};
+    enum gameState { Wait, Choose, Return};
+   
+    char phase[16]; 
+    switch(currentPhase){
+        case 0:
+	        snprintf(phase, sizeof(phase), "Roll");
+            break;
+        case 1:
+	        snprintf(phase, sizeof(phase), "Rummage");
+            break;
+        case 2:
+	        snprintf(phase, sizeof(phase), "Shop");
+            break;
+        case 3:
+	        snprintf(phase, sizeof(phase), "Murder");
+            break;
+        case 4:
+	        snprintf(phase, sizeof(phase), "War");
+            break;
+        case 5:
+	        snprintf(phase, sizeof(phase), "Double");
+            break;
+    }
+
+    char state[16];
+    switch(currentState){
+        case 0:
+	        snprintf(state, sizeof(state), "Wait");
+            break;
+        case 1:
+	        snprintf(state, sizeof(state), "Choose");
+            break;
+        case 2:
+	        snprintf(state, sizeof(state), "Return");
+            break;
+    }
+
+	snprintf(introBuffer, sizeof(introBuffer), "Phase: %s, State: %s", phase, state);
+    RenderDebugText(introBuffer);
+
+    if(currentPhase == Double && currentState == Wait){
+        int maxCards = 0;
+        int maxCardAmount = 0;
+        for(int i = 0; i < 4; i++){
+            if(maxCardAmount == hand[i].level){
+                maxCards++;
+            } else if (maxCardAmount < hand[i].level){
+                maxCards = 1;
+                maxCardAmount = hand[i].level;
+            } 
+        }        
+
+        if(maxCards == 1){
+            currentState = Return; 
+        } else if (maxCards == 4 && maxCardAmount == 1){
+            currentPhase = Roll;
+            currentState = Choose; 
+        } else {
+            currentState = Choose;
+        }
+    }
+
+    if(currentPhase == Double){
+        char introBuffer[64];
+
+        if(currentState == Return){
+	        snprintf(introBuffer, sizeof(introBuffer), "DOUBLE!! Press Enter to lose highest card");
+            RenderTurnInfoText(introBuffer);
+        } else {
+	        snprintf(introBuffer, sizeof(introBuffer), "DOUBLE!! Press 1-4 to lose highest card");
+            RenderTurnInfoText(introBuffer);
+           
+            int highestNum = 0; 
+            int highCards[5];
+            for(int i = 0; i < 4; i++){
+                if(hand[i].level > highestNum){
+                    for(int j = 0; j < 4; j++){
+                        if(i == j){
+                            highCards[j] = 1;
+                        } else {
+                            highCards[j] = 28;
+                        }
+                    }
+                } else if (hand[i].level == highestNum){
+                    highCards[i] = 1;
+                }
+            }
+            highCards[4] = 28;
+
+            RenderNumberLable(highCards, 5, 0);
+        }
     }
 }
 

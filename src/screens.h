@@ -101,6 +101,7 @@ void ReturnShopCards(int keycode, int indexPos);
 void RenderRummage(void);
 void CheckForRummageMurder(int keycode, int indexPos);
 void ReturnCards(int keycode, int indexPos, int pile[]);
+void ReturnDouble(int keycode, int indexPos);
 
 //----------------------------------------------------------------------------------
 // Ending Screen Functions Declaration
