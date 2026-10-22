@@ -43,6 +43,9 @@ Texture2D deckSpriteSheet = { 0 };
 Texture2D dieSpriteSheet = { 0 };
 Music music = { 0 };
 Sound fxCoin = { 0 };
+Sound fxRoll = { 0 };
+Sound fxCard = { 0 };
+Sound fxDouble = { 0 };
 
 //----------------------------------------------------------------------------------
 // Global Variables Definition (local to this module)
@@ -91,6 +94,9 @@ int main(void)
 
     //music = LoadMusicStream("resources/ambient.ogg"); // TODO: Load music
     fxCoin = LoadSound("resources/coin.wav");
+    fxRoll = LoadSound("resources/dieRolled.wav");
+    fxCard = LoadSound("resources/cardPlace.wav");
+    fxDouble = LoadSound("resources/double.wav");
 
     SetMusicVolume(music, 1.0f);
     PlayMusicStream(music);
@@ -129,6 +135,9 @@ int main(void)
     UnloadFont(font);
     UnloadMusicStream(music);
     UnloadSound(fxCoin);
+    UnloadSound(fxRoll);
+    UnloadSound(fxCard);
+    UnloadSound(fxDouble);
 
     CloseAudioDevice();     // Close audio context
 

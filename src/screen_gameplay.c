@@ -35,6 +35,7 @@ bool debug;
 static int framesCounter = 0;
 static int finishScreen = 0;
 static float monthTextTimer = 0.0f;
+static float nextDieTimer = 0.0f;
 static int currentMonth = 0;
 
 const int cardWidth = 62;
@@ -54,10 +55,14 @@ const int sideBuffer = 40;
 
 struct Die {
     bool hasBeenRolled;
-    bool hasBeenMoved; 
+    bool hasBeenMoved;
+    float currentScale;
+    float desiredScale;
     int numberRolled;
     int posIndex;
 };
+
+bool playDiceSound;
 
 Music baseTrack;
 
@@ -70,7 +75,7 @@ struct musicLayer phaseLayer[5];
 
 struct Die die[2];
 
-enum gamePhases { Roll, Rummage, Shop, Murder, War, Double};
+enum gamePhases { Roll, Rummage, Shop, Murder, War, Double, End};
 enum gameState { Wait, Choose, Return};
 enum decipleType { Banker, Pol, Knight, Doc };
 
@@ -105,23 +110,28 @@ int rummage[19];
 int rummagePower;
 
 int shop[6];
+struct cardVisuals shopVisuals[6];
 bool shopStocked;
 
 bool buttonPressedThisFrame;
 
 void InitGameplayScreen(void)
 {
-    debug = true;
+    debug = false;
 
     framesCounter = 0;
     finishScreen = 0;
 
     monthTextTimer = 1.0f;
     currentMonth = 1;
+
+    nextDieTimer = 0.25f;
     
     for(int i = 0; i < 2; i++){
         die[i].hasBeenRolled = false;
         die[i].hasBeenMoved = false;
+        die[i].currentScale = 1.5f;
+        die[i].desiredScale = 2.2f;
         die[i].numberRolled = 0;
         die[i].posIndex = 0;
     }
@@ -188,7 +198,9 @@ void InitGameplayScreen(void)
 void UpdateGameplayScreen(void)
 {
     if (monthTextTimer > 0.0f){
-	    monthTextTimer -= GetFrameTime();
+        if(currentPhase != End){
+	        monthTextTimer -= GetFrameTime();
+        }
     } else if (currentPhase == Roll && currentState == Wait){
         for(int i = 0; i < CARDS_IN_HAND; i++){
             hand[i].boostedLevel = 0;
@@ -205,12 +217,25 @@ void UpdateGameplayScreen(void)
             shop[i] = 28;
         }
     }
+
+    if(currentPhase == War && currentState == Choose){
+        if(warHand[0] > hand[0].level){
+            currentState = Return;
+        }
+    } 
+
+    if(currentPhase == War && currentState == Return){
+        if(warHand[1] > hand[1].level){
+            currentPhase = End;
+            currentState = Wait;
+        }
+    }
     
     /*
     if (IsKeyPressed(KEY_ENTER))
     {
         finishScreen = 1;
-        PlaySound(fxCoin);
+        PlaySound(fxRoll);
     }
     */
 
@@ -349,6 +374,9 @@ void ReturnDouble(int keycode, int indexPos){
     hand[indexPos - 1].mem[memIndex] = -1;
     hand[indexPos - 1].level = hand[indexPos - 1].mem[memIndex - 1] % 14;
 
+    nextDieTimer = 0.25f;
+    die[0].desiredScale = 2.2f;
+    die[1].desiredScale = 2.2f;
     currentPhase = Roll;
     currentState = Wait;
     buttonPressedThisFrame = true;
@@ -420,6 +448,9 @@ void ReturnCards(int keycode, int indexPos, int pile[]){
                 }
             }
     
+            nextDieTimer = 0.25f;
+            die[0].desiredScale = 2.2f;
+            die[1].desiredScale = 2.2f;
             currentPhase = Roll;
             currentState = Wait;
             monthTextTimer = 1.0f;
@@ -580,6 +611,56 @@ void RenderCardRow(int cardRow[], int cardRowSize, int rowPos){
     }
 }
 
+void RenderMovingCardRow(int cardRow[], struct cardVisuals visuals[], int cardRowSize, int rowPos){
+    Vector2 origin = {0.0f, 0.0f};
+    float rotation = 0.0f;
+    
+    int currentCard = 0;
+    for(int i = 0; i < cardRowSize; i++){
+        if(visuals[i].cardDisplayed){
+            currentCard++;
+        } else {
+            break;
+        }
+    }
+
+    float accuracy = 0.5f;
+    float offset = (cardWidth * visuals[currentCard].currentScale) - (cardWidth * visuals[currentCard].desiredScale) / 2;
+    int spacingSize = FindScreenSpacing(sideBuffer, cardRowSize, cardWidth * scale);
+    
+    Vector2 pos = {sideBuffer, GetScreenHeight() - ((rowPos + 1) * cardHeight * scale) - ((rowPos + 1) * bottomBuffer)};
+
+    for(int i = 0; i < cardRowSize; i++){
+        if(!visuals[i].cardDisplayed && currentCard == i){
+            if(visuals[i].currentScale < visuals[i].desiredScale - accuracy){
+                visuals[i].currentScale += 0.8f;
+            } else if (visuals[i].currentScale > visuals[i].desiredScale + accuracy){
+                visuals[i].currentScale -= 0.8f;
+            } else if (visuals[i].desiredScale == 2.2f){
+                visuals[i].desiredScale = 2.0f;
+            } else {
+                PlaySound(fxCard);
+                visuals[i].cardDisplayed = true;
+            }
+        }
+
+        if(visuals[i].cardDisplayed){
+            pos.y = GetScreenHeight() - ((rowPos + 1) * cardHeight * scale) - ((rowPos + 1) * bottomBuffer);
+            pos.x = sideBuffer + (cardWidth * scale * i) + (spacingSize * i);
+        } else if (i == currentCard){
+            pos.y = GetScreenHeight() - ((rowPos + 1) * cardHeight * scale) - ((rowPos + 1) * bottomBuffer) + offset;
+            pos.x = sideBuffer + (cardWidth * scale * i) + (spacingSize * i) + offset;
+        } else {
+            continue;
+        }
+
+        Rectangle sourceRec = GetSpriteInSheet(deckSpriteSheet, cardRow[i], cardWidth, cardHeight, xOffset, yOffset, 1);
+
+        Rectangle scaledRec = {pos.x, pos.y, cardWidth * scale, cardHeight * scale};
+        DrawTexturePro(deckSpriteSheet, sourceRec, scaledRec, origin, rotation, WHITE);
+    }
+}
+
 void RenderNumberLable(int cardRow[], int cardRowSize, int rowPos){
     int spacingSize = FindScreenSpacing(sideBuffer, cardRowSize, cardWidth * scale);
 
@@ -621,7 +702,11 @@ void RenderPlayersHand(void){
 
     for(int i = 0; i < CARDS_IN_HAND + 1; i++){
         if(i == CARDS_IN_HAND){
-            displayHand[i] = banish[banishIndex];
+            if(currentPhase == War){
+                displayHand[i] = 28;
+            } else {
+                displayHand[i] = banish[banishIndex];
+            }
         } else {
             displayHand[i] = hand[i].level + (14 * hand[i].deciple); 
         }
@@ -633,7 +718,11 @@ void RenderDeck(void){
     int row2[CARDS_IN_HAND + 1];
     for(int i = 0; i < CARDS_IN_HAND + 1; i++){
         if(i == CARDS_IN_HAND){
-            row2[i] = 0;
+            if(currentPhase == War){
+                row2[i] = 28;
+            } else {
+                row2[i] = 0;
+            }
         } else {
             row2[i] = 28;
         }
@@ -642,16 +731,20 @@ void RenderDeck(void){
 }
 
 void RenderMurderPile(void){
-    if(currentPhase == War && currentState == Wait){
+    if(currentPhase == War && currentState == Wait && warHand[0] == 28){
         int rolesFilled = 0;
         int cardsRemaning = 0;
+
+        printf("[");
         for(int i = 0; i < 56; i++){
+            printf("%i,", banish[i]);
             if(banish[i] == 28){
                 break;
             }
 
             cardsRemaning++;
         }
+        printf("]\n");
         
         int randomIndex;
         while(cardsRemaning > 0 && rolesFilled < 4){
@@ -665,6 +758,7 @@ void RenderMurderPile(void){
 
             if(warHand[banishCardType] == 28){
                 rolesFilled++;
+                warHand[banishCardType] = banish[randomIndex];
             } else if (warHand[banishCardType] < banish[randomIndex]) {
                 warHand[banishCardType] = banish[randomIndex];
             }
@@ -673,14 +767,20 @@ void RenderMurderPile(void){
             cardsRemaning--;
         }
 
-        if(rolesFilled >= 4){
-            currentState = Choose; 
-        }
+        printf("[%i, %i, %i, %i]\n", warHand[0], warHand[1], warHand[2], warHand[3]);
+    }
+
+    if(monthTextTimer <= 0 && currentPhase == War){
+        currentState = Choose;
     }
 
     int row4[CARDS_IN_HAND + 1];
     for(int i = 0; i < CARDS_IN_HAND + 1; i++){
-        row4[i] = 28;
+        if(currentPhase == War && i != CARDS_IN_HAND){
+            row4[i] = warHand[i];
+        } else {
+            row4[i] = 28;
+        }
     }
 
     for(int i = 0; i < 56; i++){
@@ -743,9 +843,33 @@ void RenderMonthText(void){
         char introBuffer[32];
 
         if(currentMonth >= 11){
-	        snprintf(introBuffer, sizeof(introBuffer), "WAR!");
-            currentPhase = War;
-            currentState = Wait;
+            if(currentPhase == War){
+	            snprintf(introBuffer, sizeof(introBuffer), "WAR!");
+                currentPhase = War;
+                currentState = Wait;
+            } else {
+                int enemyHealth = warHand[3] / 14;
+                int yourHealth = hand[3].level;
+                int enemyAttack = warHand[2] / 14;
+                int yourAttack = hand[2].level;
+                bool yourTurn = true;
+                
+                while(yourHealth > 0 && enemyHealth > 0){
+                    if(yourTurn){
+                        enemyHealth -= yourAttack;
+                    } else {
+                        yourHealth -= enemyAttack;
+                    } 
+
+                    yourTurn = !yourTurn;
+                    
+                    if(yourHealth <= 0){
+	                    snprintf(introBuffer, sizeof(introBuffer), "YOU WIN!");
+                    } else if (enemyHealth <= 0){
+	                    snprintf(introBuffer, sizeof(introBuffer), "YOU LOSE!");
+                    }
+                }
+            }
         } else {
 	        snprintf(introBuffer, sizeof(introBuffer), "MONTH %d", currentMonth);
         }
@@ -764,14 +888,23 @@ void RenderDie(int i){
     Vector2 origin = { 0.0f, 0.0f };
     float rotation = 0.0f;
 
-        Vector2 pos = CalculateDiePosition(die[i].posIndex, i + 1);
-        
-        if(die[i].hasBeenRolled){
-            Rectangle sourceRec = GetSpriteInSheet(dieSpriteSheet, die[i].numberRolled, dieWidth, dieHeight, xDieOffset, yDieOffset, 1);
+    Vector2 pos = CalculateDiePosition(die[i].posIndex, i + 1);
+       
+    float accuracy = 0.05f;
+    if(die[i].hasBeenRolled){
+        Rectangle sourceRec = GetSpriteInSheet(dieSpriteSheet, die[i].numberRolled, dieWidth, dieHeight, xDieOffset, yDieOffset, 1);
 
-            Rectangle scaledRec = {pos.x, pos.y, dieWidth * scale, dieHeight * scale};
-            DrawTexturePro(dieSpriteSheet, sourceRec, scaledRec, origin, rotation, WHITE);
-        } 
+        if(die[i].currentScale < die[i].desiredScale - accuracy){
+            die[i].currentScale += 0.08f;
+        } else if(die[i].currentScale > die[i].desiredScale + accuracy) {
+            die[i].currentScale -= 0.08f;
+        } else if (die[i].desiredScale == 2.2f){
+            die[i].desiredScale = 2.0f;
+        }
+
+        Rectangle scaledRec = {pos.x, pos.y, dieWidth * die[i].currentScale, dieHeight * die[i].currentScale};
+        DrawTexturePro(dieSpriteSheet, sourceRec, scaledRec, origin, rotation, WHITE);
+    } 
 }
 
 void RenderAndStockShop(){
@@ -783,9 +916,15 @@ void RenderAndStockShop(){
             }
         }
 
-        if(cardsInDeck == 0){
-            currentPhase = War;
-            return;
+        for(int i = 0; i < 6; i++){
+            shopVisuals[i].currentScale = 1.5f;
+            shopVisuals[i].desiredScale = 2.2f;
+            shopVisuals[i].cardWaitTime = 0.25f;
+            shopVisuals[i].cardDisplayed = false;
+
+            if(i == 5){
+                shopVisuals[i].cardDisplayed = true;
+            }
         }
 
         int cardsToStock;
@@ -808,7 +947,7 @@ void RenderAndStockShop(){
         shopStocked = true;
     }
 
-    RenderCardRow(shop, 6, 2);    
+    RenderMovingCardRow(shop, shopVisuals, 6, 2);    
 }
 
 void RenderTurnInfoText(char introBuffer[]){
@@ -818,6 +957,10 @@ void RenderTurnInfoText(char introBuffer[]){
 	Vector2 textSize = MeasureTextEx(font, introBuffer, fontSize, spacing);
 
 	Vector2 textPos = {sideBuffer, bottomBuffer};
+    if(currentPhase == War){
+        textPos.y = (bottomBuffer * 3) + (cardHeight * scale);
+    }
+
 	DrawTextEx(font, introBuffer, textPos, fontSize, spacing, DARKBROWN);
 }
 
@@ -832,6 +975,10 @@ void RenderDebugText(char introBuffer[]){
 	Vector2 textSize = MeasureTextEx(font, introBuffer, fontSize, spacing);
 
 	Vector2 textPos = {sideBuffer, bottomBuffer + 100};
+    if(currentPhase == War){
+        textPos.y = 200;
+    }
+
 	DrawTextEx(font, introBuffer, textPos, fontSize, spacing, DARKBROWN);
 }
 
@@ -845,21 +992,34 @@ void DrawGameplayScreen(void)
     RenderDeck(); 
     RenderMurderPile();
 	
-    if ((currentPhase == Roll || currentPhase == War) && currentState == Wait){
+    if ((currentPhase == Roll || currentPhase == War || currentPhase == End) && currentState == Wait){
         RenderMonthText();
-    } else if (!die[0].hasBeenRolled || !die[1].hasBeenRolled) {
+    } else if ((!die[0].hasBeenRolled || !die[1].hasBeenRolled) && currentPhase != War) {
 	    srand(time(NULL));
+        playDiceSound = false;
 
         for(int i = 0; i < 2; i++){
             if(!die[i].hasBeenRolled){
+                if(i == 1 && nextDieTimer > 0){
+	                nextDieTimer -= GetFrameTime();
+                    break;
+                }
+
+                playDiceSound = true;
                 die[i].hasBeenRolled = true;
                 die[i].numberRolled = rand() % 6;
             } 
         } 
 
-        if(die[0].numberRolled == die[1].numberRolled){
+        if(die[0].numberRolled == die[1].numberRolled && die[1].hasBeenRolled){
+            PlaySound(fxDouble);
+            playDiceSound = false;
             currentPhase = Double;
             currentState = Wait;
+        }
+
+        if(playDiceSound){
+            PlaySound(fxRoll);
         }
     }
     
@@ -868,13 +1028,15 @@ void DrawGameplayScreen(void)
         RenderNumberLable(rummage, rummagePower + 1, 2);
     }
 
-    if((currentPhase == Shop || currentPhase == Murder) && (currentState == Choose || currentState == Return)){
+    if((currentPhase == Shop || currentPhase == Murder) && (currentState == Choose || currentState == Return) && shopVisuals[4].cardDisplayed){
         RenderAndStockShop();                
         RenderNumberLable(shop, 6, 2);
     }
 
-    for(int i = 0; i < 2; i++){
-        RenderDie(i);
+    if(currentPhase != War){
+        for(int i = 0; i < 2; i++){
+            RenderDie(i);
+        }
     }
 	
     if (die[0].hasBeenRolled && die[1].hasBeenRolled && (currentPhase == Roll)) {
@@ -911,6 +1073,12 @@ void DrawGameplayScreen(void)
 	    snprintf(introBuffer, sizeof(introBuffer), "Press 1-9 and a-i to return cards");
         RenderTurnInfoText(introBuffer);
     }
+    
+    if(currentPhase == War && currentState == Choose){
+        char introBuffer[64];
+	    snprintf(introBuffer, sizeof(introBuffer), "Press 1-4 to buy card");
+        RenderTurnInfoText(introBuffer);
+    }
         
     char introBuffer[64];
 
@@ -936,6 +1104,9 @@ void DrawGameplayScreen(void)
             break;
         case 5:
 	        snprintf(phase, sizeof(phase), "Double");
+            break;
+        case 6:
+            snprintf(phase, sizeof(phase), "END");
             break;
     }
 
@@ -1014,23 +1185,24 @@ Vector2 CalculateDiePosition(int dieIndexPos, int dieNumber){
     int yPos = 0;
 
     int spacingSize = FindScreenSpacing(sideBuffer, CARDS_IN_HAND + 1, cardWidth * scale);
-
+    
+    float offset = ((dieWidth * 2) - (dieWidth * die[dieNumber - 1].currentScale)) / 2;
     switch (dieIndexPos){
 	    case 0:
 	        if(dieNumber == 1){
-                xPos = GetScreenWidth() - (GetScreenWidth() / 2) - (dieWidth * scale) - (dieBuffer / 2);
+                xPos = GetScreenWidth() - (GetScreenWidth() / 2) - (dieWidth * die[dieNumber - 1].currentScale) - (dieBuffer / 2) - offset;
 	        } else {
-		        xPos = GetScreenWidth() - (GetScreenWidth() / 2) + (dieBuffer / 2);
+		        xPos = GetScreenWidth() - (GetScreenWidth() / 2) + (dieBuffer / 2) - offset;
 	        }
 	    
-    	    yPos = GetScreenHeight() - (cardHeight * scale * 1.5f) - (bottomBuffer * 2) - ((dieHeight * scale) / 2);
+    	    yPos = GetScreenHeight() - (cardHeight * scale * 1.5f) - (bottomBuffer * 2) - ((dieHeight * scale) / 2) - offset;
             break;
 	case 1:
 	case 2:
 	case 3:
     case 4:
-	    xPos = sideBuffer + ((dieIndexPos - 1) * cardWidth * scale) + ((cardWidth * scale) / 2) + ((dieIndexPos - 1) * spacingSize) - ((dieWidth * scale) / 2);
-        yPos = GetScreenHeight() - (bottomBuffer * 2) - (cardHeight * scale);
+	    xPos = sideBuffer + ((dieIndexPos - 1) * cardWidth * scale) + ((cardWidth * scale) / 2) + ((dieIndexPos - 1) * spacingSize) - ((dieWidth * die[dieNumber - 1].currentScale) / 2) - offset;
+        yPos = GetScreenHeight() - (bottomBuffer * 2) - (cardHeight * scale) - offset;
 	    break;
 	default:
 	    break;	    

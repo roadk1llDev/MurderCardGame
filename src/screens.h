@@ -40,6 +40,15 @@ extern Texture2D deckSpriteSheet;
 extern Texture2D dieSpriteSheet;
 extern Music music;
 extern Sound fxCoin;
+extern Sound fxRoll;
+extern Sound fxCard;
+extern Sound fxDouble;
+struct cardVisuals {
+    float currentScale;
+    float desiredScale;
+    float cardWaitTime;
+    bool cardDisplayed;
+};
 
 #ifdef __cplusplus
 extern "C" {            // Prevents name mangling of functions
@@ -102,6 +111,7 @@ void RenderRummage(void);
 void CheckForRummageMurder(int keycode, int indexPos);
 void ReturnCards(int keycode, int indexPos, int pile[]);
 void ReturnDouble(int keycode, int indexPos);
+void RenderMovingCardRow(int cardRow[], struct cardVisuals visuals[], int cardRowSize, int rowPos);
 
 //----------------------------------------------------------------------------------
 // Ending Screen Functions Declaration
